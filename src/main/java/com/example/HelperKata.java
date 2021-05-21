@@ -9,20 +9,21 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 
 public class HelperKata {
-    private static final  String EMPTY_STRING = "";
+    private static final String EMPTY_STRING = "";
     private static String ANTERIOR_BONO = null;
+
+    private HelperKata(){ }
 
     private static Flux<String> createFluxFrom(String fileBase64) {
         return Flux.using(
                 () -> new BufferedReader(
                         new InputStreamReader(
                                 new ByteArrayInputStream(decodeBase64(fileBase64))))
-                        .lines(),
+                        .lines().skip(1),
                 Flux::fromStream,
                 Stream::close
         );
@@ -36,18 +37,22 @@ public class HelperKata {
         var counter = new AtomicInteger(0);
         String characterSeparated = FileCSVEnum.CHARACTER_DEFAULT.getId();
         Set<String> codes = new HashSet<>();
-        return fileFlux.skip(1)
+        return fileFlux
                 .map(line -> getTupleOfLine(line, line.split(characterSeparated), characterSeparated))
                 .map(tuple -> getCouponDetailDto(counter, codes, tuple));
     }
 
     private static CouponDetailDto getCouponDetailDto(AtomicInteger counter, Set<String> codes, Tuple2<String, String> tuple) {
-        String dateValidated ;
+        String dateValidated;
         String bonoForObject;
         String bonoEnviado;
 
         String errorMessage = messageError(codes, tuple);
-        dateValidated= Optional.of(errorMessage).filter(el -> el.equals(null)).map(el ->tuple.getT2()).orElse(null);
+        dateValidated = Optional.of(errorMessage)
+                .filter(obj -> false)
+                .map(el -> tuple.getT2())
+                .orElse(null);
+
         bonoEnviado = tuple.getT1();
         bonoForObject = getBonoForObject(bonoEnviado);
 
@@ -60,15 +65,15 @@ public class HelperKata {
                 .build();
     }
 
-    private static String messageError(Set<String> codes, Tuple2<String, String> tuple){
-        Map<String,Boolean> map = new LinkedHashMap<>();
-        map.put(ExperienceErrorsEnum.FILE_ERROR_COLUMN_EMPTY.toString(),isBlankTuple(tuple));
-        map.put(ExperienceErrorsEnum.FILE_ERROR_CODE_DUPLICATE.toString(),!codes.add(tuple.getT1()));
-        map.put(ExperienceErrorsEnum.FILE_ERROR_DATE_PARSE.toString(),!validateDateRegex(tuple.getT2()));
-        map.put(ExperienceErrorsEnum.FILE_DATE_IS_MINOR_OR_EQUALS.toString(),validateDateIsMinor(tuple.getT2()));
+    private static String messageError(Set<String> codes, Tuple2<String, String> tuple) {
+        Map<String, Boolean> map = new LinkedHashMap<>();
+        map.put(ExperienceErrorsEnum.FILE_ERROR_COLUMN_EMPTY.toString(), isBlankTuple(tuple));
+        map.put(ExperienceErrorsEnum.FILE_ERROR_CODE_DUPLICATE.toString(), !codes.add(tuple.getT1()));
+        map.put(ExperienceErrorsEnum.FILE_ERROR_DATE_PARSE.toString(), !validateDateRegex(tuple.getT2()));
+        map.put(ExperienceErrorsEnum.FILE_DATE_IS_MINOR_OR_EQUALS.toString(), validateDateIsMinor(tuple.getT2()));
 
-        for (Map.Entry<String, Boolean> jugador : map.entrySet()){
-            if(jugador.getValue()){
+        for (Map.Entry<String, Boolean> jugador : map.entrySet()) {
+            if (jugador.getValue()) {
                 return jugador.getKey();
             }
         }
@@ -89,11 +94,14 @@ public class HelperKata {
         return bonoForObject;
 
         //Funcional
-        /*return Optional.of(bonoEnviado).filter(el->isNullOrEquals(el)).map(el->{
-            ANTERIOR_BONO=typeBono(el);
-            return el;
-        }).orElse(null);*/
-
+        /*
+        return Optional.of(bonoEnviado)
+            .filter(el->isNullOrEquals(el))
+            .map(el->{
+                ANTERIOR_BONO=typeBono(el);
+                return el;
+        }).orElse(null);
+        */
     }
 
     private static boolean isNullOrEquals(String bonoEnviado) {
@@ -117,32 +125,20 @@ public class HelperKata {
                 && numberLessOrEqual(bonoIn.replace("*", "").length(), 43);
     }
 
-    private static boolean numberLessOrEqual(int num1, int num2){
+    private static boolean numberLessOrEqual(int num1, int num2) {
         return num1 <= num2;
     }
 
-    private static boolean numberBiggestOrEqual(int num1, int num2){
+    private static boolean numberBiggestOrEqual(int num1, int num2) {
         return num1 >= num2;
     }
 
-   /* private static boolean matchesBono(String bonoIn) {
-        return bonoIn.chars().allMatch(Character::isDigit) && lenghtBono(bonoIn);
-    }
-
-    private static boolean lenghtBono(String bonoIn) {
-        return numberBiggestOrEqual(bonoIn.length(), 12) && numberLessOrEqual(bonoIn.length(), 13);
-    }*/
-
     public static boolean validateDateRegex(String dateForValidate) {
-        String regex = FileCSVEnum.PATTERN_DATE_DEFAULT.getId();
-        var pattern = Pattern.compile(regex);
-        var matcher = pattern.matcher(dateForValidate);
-        return matcher.matches();
+        return dateForValidate.matches(FileCSVEnum.PATTERN_DATE_DEFAULT.getId());
     }
 
     private static byte[] decodeBase64(final String fileBase64) {
         return Base64.getDecoder().decode(fileBase64);
-
     }
 
     private static Tuple2<String, String> getTupleOfLine(String line, String[] array, String characterSeparated) {
